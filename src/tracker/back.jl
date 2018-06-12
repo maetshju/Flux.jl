@@ -23,7 +23,7 @@ end
 
 back_(f, y, args...) = back(f, args...)
 back_(c::Call, y, Δ) = back_(c.func, y, Δ, c.args...)
-back_(::Call{Void}, y, Δ) = nothing
+back_(::Call{Nothing}, y, Δ) = nothing
 
 accum!(x, Δ) = x .+ Δ
 accum!(x::AbstractArray, Δ) = (x .+= Δ)
@@ -41,7 +41,7 @@ function back(x::Tracked, Δ)
 end
 
 back(x, Δ) = back(tracker(x), Δ)
-back(x::Void, Δ) = error("Can't backpropagate through `nothing`")
+back(x::Nothing, Δ) = error("Can't backpropagate through `nothing`")
 
 macro back(x, Δ)
   quote

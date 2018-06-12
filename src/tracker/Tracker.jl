@@ -31,7 +31,7 @@ mutable struct Tracked{T}
   grad::T
   Tracked{T}(f::Call, data::T) where T = new(0, f, false, data)
   Tracked{T}(f::Call, data::T, grad::T) where T = new(0, f, false, data, grad)
-  Tracked{T}(f::Call{Void}, data::T, grad::T) where T = new(0, f, true, data, grad)
+  Tracked{T}(f::Call{Nothing}, data::T, grad::T) where T = new(0, f, true, data, grad)
 end
 
 Tracked(f::Call, x) = Tracked{typeof(x)}(f, x)
