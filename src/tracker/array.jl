@@ -1,3 +1,5 @@
+using LinearAlgebra
+
 struct TrackedArray{T,N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
   tracker::Tracked{A}
   data::A
@@ -71,24 +73,8 @@ back(::typeof(-), Δ, xs::TrackedArray) = back(xs, -Δ)
 Base.transpose(xs::TrackedArray) = track(transpose, xs)
 Base.ctranspose(xs::TrackedArray) = track(ctranspose, xs)
 
-back(::typeof(transpose), Δ, xs) = @back(xs, trim(xs, Δ.'))
+back(::typeof(transpose), Δ, xs) = @back(xs, trim(xs, transpose(Δ)))
 back(::typeof(ctranspose), Δ, xs) = @back(xs, trim(xs, Δ'))
-
-Base.repmat(x::TrackedVecOrMat, a::Integer...) = track(repmat, x, a...)
-Base.repmat(x::TrackedVecOrMat, a::Int64...) = track(repmat, x, a...)
-
-function back(::typeof(repmat), Δ, xs::TrackedVecOrMat, m, n=1)
-    Δ′ = similar(xs.data)
-    S = size(xs.data)
-    for (i,v) in enumerate(Δ)
-        d1 = divrem(i-1, S[1]*m)
-        x = d1[2] % S[1]+1
-        y = d1[1] % S[2]+1
-        Δ′[x, y] += v
-    end
-    back(xs, Δ′)
-end
-
 
 _repeat(A, inner, outer) = Base.repeat(A; inner=inner, outer=outer)
 Base.repeat(A::TrackedArray; inner=ntuple(x->1, ndims(A)), outer=ntuple(x->1, ndims(A))) = track(_repeat, A, inner, outer)
@@ -97,7 +83,7 @@ function back(::typeof(_repeat), Δ, xs::TrackedArray, inner, outer)
     Δ′ = similar(xs.data)
     Δ′ .= 0
     S = size(xs.data)
-    
+
     # Loop through each element of Δ, calculate source dimensions, accumulate into Δ′
     for (dest_idx, val) in enumerate(IndexCartesian(), Δ)
         # First, round dest_idx[dim] to nearest gridpoint defined by inner[dim], then
@@ -107,7 +93,6 @@ function back(::typeof(_repeat), Δ, xs::TrackedArray, inner, outer)
     end
     back(xs, Δ′)
 end
-
 
 for f in [:vcat, :hcat]
   @eval begin
@@ -222,9 +207,11 @@ Base.maximum(xs::TrackedArray, region) = track(maximum, xs, region)
 Base.minimum(xs::TrackedArray) = track(minimum, xs)
 Base.minimum(xs::TrackedArray, region) = track(minimum, xs, region)
 
-LinAlg.dot(xs::TrackedVector, ys::TrackedVector) = track(dot, xs, ys)
-LinAlg.dot(xs::AbstractVector, ys::TrackedVector) = track(dot, xs, ys)
-LinAlg.dot(xs::TrackedVector, ys::AbstractVector) = track(dot, xs, ys)
+import LinearAlgebra: dot
+
+dot(xs::TrackedVector, ys::TrackedVector) = track(dot, xs, ys)
+dot(xs::AbstractVector, ys::TrackedVector) = track(dot, xs, ys)
+dot(xs::TrackedVector, ys::AbstractVector) = track(dot, xs, ys)
 
 function back(::typeof(dot), Δ, xs, ys)
   @back(xs, Δ.*data(ys))
@@ -237,7 +224,7 @@ Base.std(x::TrackedArray; mean = Base.mean(x)) =
 Base.std(x::TrackedArray, dim; mean = Base.mean(x, dim)) =
   sqrt.(sum((x .- mean).^2, dim) ./ (size(x, dim)-1))
 
-Base.vecnorm(x::TrackedArray, p::Real = 2) =
+LinearAlgebra.vecnorm(x::TrackedArray, p::Real = 2) =
   sum(abs.(x).^p .+ eps(0f0))^(1/p) # avoid d(sqrt(x))/dx == Inf at 0
 
 back(::typeof(mean), Δ, xs::TrackedArray) = back(xs, similar(xs.data) .= Δ ./ length(xs.data))
@@ -271,7 +258,7 @@ end
 
 # BLAS
 
-Base.diagm(x::TrackedVector) = track(diagm, x)
+LinearAlgebra.diagm(x::TrackedVector) = track(diagm, x)
 back(::typeof(diagm), Δ, x) = @back(x, diag(Δ))
 
 for f in :[*, Ac_mul_B, A_mul_Bc].args
@@ -309,7 +296,7 @@ end
 # Fast path for matrix-vector
 function back(::typeof(*), Δ::AbstractVector, W::TrackedMatrix, x::AbstractVector)
   if isleaf(W)
-    W.grad .+= Δ .* data(x).'
+    W.grad .+= Δ .* transpose(data(x))
   else
     back(W, A_mul_Bt(Δ, data(x)))
   end

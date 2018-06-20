@@ -20,7 +20,7 @@ function mapleaves(f, x; cache = ObjectIdDict())
   cache[x] = isleaf(x) ? f(x) : mapchildren(x -> mapleaves(f, x, cache = cache), x)
 end
 
-function prefor(f, x; seen = OSet())
+function prefor(f, x; seen = IdSet())
   x ∈ seen && return
   f(x)
   foreach(x -> prefor(f, x, seen = seen), children(x))
