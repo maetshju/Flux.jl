@@ -1,4 +1,3 @@
-using Juno
 using Flux.Tracker: back!
 
 runall(f) = f
@@ -35,7 +34,7 @@ Multiple optimisers and callbacks can be passed to `opt` and `cb` as arrays.
 function train!(loss, data, opt; cb = () -> ())
   cb = runall(cb)
   opt = runall(opt)
-  @progress for d in data
+  for d in data
     l = loss(d...)
     isinf(l) && error("Loss is Inf")
     isnan(l) && error("Loss is NaN")
