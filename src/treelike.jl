@@ -20,8 +20,6 @@ function mapleaves(f, x; cache = ObjectIdDict())
   cache[x] = isleaf(x) ? f(x) : mapchildren(x -> mapleaves(f, x, cache = cache), x)
 end
 
-using DataFlow: OSet
-
 function prefor(f, x; seen = OSet())
   x ∈ seen && return
   f(x)

@@ -25,6 +25,7 @@ using .Optimise: @epochs
 export SGD, ADAM, AdaMax, Momentum, Nesterov,
        RMSProp, ADAGrad, ADADelta, AMSGrad, NADAM
 
+include("oset.jl")
 include("utils.jl")
 include("onehot.jl")
 include("treelike.jl")
