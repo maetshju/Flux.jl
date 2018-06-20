@@ -4,7 +4,7 @@ module Flux
 
 # Zero Flux Given
 
-using Requires, Reexport
+using Requires, Reexport, StatsBase
 using MacroTools: @forward
 
 export Chain, Dense, RNN, LSTM, GRU, Conv,
