@@ -1,3 +1,5 @@
+import Base: *, ==
+
 using LinearAlgebra
 
 struct TrackedArray{T,N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
@@ -52,9 +54,9 @@ Base.similar(x::TrackedArray, dims::Union{AbstractUnitRange,Integer}...) =
 
 Base.similar(x::TrackedArray, T::Type) = similar(data(x), T)
 
-Base.:(==)(x::TrackedArray, y) = data(x) == y
-Base.:(==)(y, x::TrackedArray) = y == data(x)
-Base.:(==)(x::TrackedArray, y::TrackedArray) = data(x) == data(y)
+x::TrackedArray == y = data(x) == y
+y == x::TrackedArray = y == data(x)
+x::TrackedArray == y::TrackedArray = data(x) == data(y)
 
 # Array Stdlib
 
@@ -71,10 +73,10 @@ Base.:-(xs::TrackedArray) = track(-, xs)
 back(::typeof(-), Δ, xs::TrackedArray) = back(xs, -Δ)
 
 Base.transpose(xs::TrackedArray) = track(transpose, xs)
-Base.ctranspose(xs::TrackedArray) = track(ctranspose, xs)
+Base.adjoint(xs::TrackedArray) = track(adjoint, xs)
 
 back(::typeof(transpose), Δ, xs) = @back(xs, trim(xs, transpose(Δ)))
-back(::typeof(ctranspose), Δ, xs) = @back(xs, trim(xs, Δ'))
+back(::typeof(adjoint), Δ, xs) = @back(xs, trim(xs, Δ'))
 
 _repeat(A, inner, outer) = Base.repeat(A; inner=inner, outer=outer)
 Base.repeat(A::TrackedArray; inner=ntuple(x->1, ndims(A)), outer=ntuple(x->1, ndims(A))) = track(_repeat, A, inner, outer)
@@ -263,36 +265,21 @@ end
 LinearAlgebra.diagm(x::TrackedVector) = track(diagm, x)
 back(::typeof(diagm), Δ, x) = @back(x, diag(Δ))
 
-for f in :[*, Ac_mul_B, A_mul_Bc].args
-  @eval begin
-    import Base.$f
-    $f(a::TrackedMatrix, b::TrackedMatrix)  = track($f, a, b)
-    $f(a::TrackedMatrix, b::AbstractMatrix) = track($f, a, b)
-    $f(a::AbstractMatrix, b::TrackedMatrix) = track($f, a, b)
+x::TrackedMatrix  * y::AbstractMatrix = track(*, x, y)
+y::AbstractMatrix * x::TrackedMatrix  = track(*, x, y)
+x::TrackedMatrix  * y::TrackedMatrix  = track(*, x, y)
 
-    $f(a::TrackedMatrix, b::TrackedVector)  = track($f, a, b)
-    $f(a::TrackedMatrix, b::AbstractVector) = track($f, a, b)
-    $f(a::AbstractMatrix, b::TrackedVector) = track($f, a, b)
+x::TrackedMatrix  * y::AbstractVector = track(*, x, y)
+y::AbstractMatrix * x::TrackedVector  = track(*, x, y)
+x::TrackedMatrix  * y::TrackedVector  = track(*, x, y)
 
-    $f(a::TrackedVector, b::TrackedVector)  = track($f, a, b)
-    $f(a::TrackedVector, b::AbstractVector) = track($f, a, b)
-    $f(a::AbstractVector, b::TrackedVector) = track($f, a, b)
-  end
-end
+x::TrackedVector  * y::AbstractVector = track(*, x, y)
+y::AbstractVector * x::TrackedVector  = track(*, x, y)
+x::TrackedVector  * y::TrackedVector  = track(*, x, y)
 
 function back(::typeof(*), Δ, a::AbstractMatrix, b::AbstractVecOrMat)
-  @back(a, A_mul_Bt(Δ, data(b)))
-  @back(b, At_mul_B(data(a), Δ))
-end
-
-function back(::typeof(Ac_mul_B), Δ, a::AbstractVecOrMat{<:Real}, b::AbstractVecOrMat{<:Real})
-  @back(a, A_mul_Bt(Δ, data(b))')
-  @back(b, data(a)*Δ)
-end
-
-function back(::typeof(A_mul_Bc), Δ, a::AbstractVecOrMat{<:Real}, b::AbstractVecOrMat{<:Real})
-  @back(a, Δ * data(b))
-  @back(b, At_mul_B(data(a), Δ)')
+  @back(a, Δ * transpose(data(b)))
+  @back(b, transpose(data(a)) * Δ)
 end
 
 # Fast path for matrix-vector
