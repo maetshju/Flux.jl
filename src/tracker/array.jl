@@ -377,14 +377,14 @@ function back(b::Broadcasted, Δ, args::Vararg{Any,N}) where N
   foreach((x, Δ) -> @back(x, unbroadcast(x, Δ)), args, Δargs)
 end
 
-Base.Broadcast._containertype(::Type{<:TrackedReal}) = TrackedArray
-Base.Broadcast._containertype(::Type{<:TrackedArray}) = TrackedArray
-Base.Broadcast.promote_containertype(::Type{TrackedArray}, ::Type{TrackedArray}) = TrackedArray
-Base.Broadcast.promote_containertype(::Type{Array}, ::Type{TrackedArray}) = TrackedArray
-Base.Broadcast.promote_containertype(::Type{TrackedArray}, ::Type{Array}) = TrackedArray
-Base.Broadcast.promote_containertype(::Type{TrackedArray}, ct) = TrackedArray
-Base.Broadcast.promote_containertype(ct, ::Type{TrackedArray}) = TrackedArray
-Base.Broadcast.broadcast_indices(::Type{TrackedArray}, A::Ref) = ()
-Base.Broadcast.broadcast_indices(::Type{TrackedArray}, A) = indices(A)
+using Base.Broadcast: BroadcastStyle
 
-Base.Broadcast.broadcast_c(f, ::Type{TrackedArray}, A, Bs...) = tracked_broadcast(f, A, Bs...)
+struct TrackedStyle <: BroadcastStyle end
+
+Broadcast.BroadcastStyle(::Type{<:Union{TrackedArray,TrackedReal}}) = TrackedStyle()
+Broadcast.BroadcastStyle(::TrackedStyle, ::BroadcastStyle) = TrackedStyle()
+
+function Base.copy(bc::Broadcast.Broadcasted{TrackedStyle})
+  bc = Broadcast.flatten(bc)
+  tracked_broadcast(bc.f, bc.args...)
+end
